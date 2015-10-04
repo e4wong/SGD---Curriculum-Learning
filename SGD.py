@@ -1,6 +1,7 @@
 import numpy
-from numpy import linalg
+from numpy import linalg, random as rn
 import sys
+import random
 
 def load_data(filename):
 	f = open(filename, "r")
@@ -55,12 +56,40 @@ def logistic_loss(datum, w):
 	xp = -1 * y * numpy.dot(w, x)  
 	return numpy.log(1 + numpy.exp(xp))
 
+def scale_w(lambda_, w):
+	mag = float(1)/ float(lambda_)
+	if linalg.norm(w) > mag:
+		w = (1.0/linalg.norm(w)) * (1.0/float(lambda_))  * numpy.array(w)
+	return w
+
+def derivative(datum, w):
+	(x, y) = datum
+	deno = 1.0 + numpy.exp(y * numpy.dot(x, w))
+	return  ((-float(y))/deno) * numpy.array(x) 
+
+def SGD(dataset, stepsize_constant, lambda_):
+	random.shuffle(dataset)
+	init = rn.normal(size=(1, len(dataset[0][0])))[0]
+	w = scale_w(lambda_, init)
+	for i in range(0, len(dataset)):
+		datum = dataset[i]
+		# Stepsize is current c / sqrtroot(t)
+		stepsize = float(stepsize_constant)/ numpy.sqrt((float(i + 1)))
+		delta = derivative(datum, w) + lambda_ * numpy.array(w)
+		delta = stepsize * numpy.array(delta)
+		w = w - delta
+		w = scale_w(lambda_, w)
+	return w
+
+
 def main():
 	if len(sys.argv) != 2:
 		print "Please enter a file"
 		return
 	filename = sys.argv[1]	
 	(wstar, data) = load_data(filename)
-
+	result = SGD(data, 1, 1)
+	print "Final w from SGD is " + str(result)
+	count_errors(result, data)
 
 main()
