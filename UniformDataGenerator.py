@@ -27,14 +27,16 @@ def label_data(data):
     return labeled_data
 
 def print_dataset(wstar, labeled_data):
-    print "//w* = " + str(wstar)
+    wstarconfig =  "//w* = " + str(wstar)
+    wstarconfig = wstarconfig.replace("\n", "")
+    print wstarconfig
     for (data,label) in labeled_data:
         string = ""
         for dimension in data:
             string += str(dimension) + " "
         string += str(label)
         print string
-        
+
 def main():
     if len(sys.argv) != 3:
         print "Please enter dimensions first followed by number of samples"
