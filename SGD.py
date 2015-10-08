@@ -1,5 +1,6 @@
 import numpy
 from numpy import linalg, random as rn
+import matplotlib.pyplot as plt
 import sys
 import random
 
@@ -49,7 +50,7 @@ def total_error(w, lambda_, dataset):
 	for datum in dataset:
 		sum_errors += logistic_loss(datum, w)
 	sum_errors /= len(dataset)
-	return sum_errors + (lambda_ / 2) * linalg.norm(w) ** 2
+	return sum_errors + (float(lambda_) / 2.0) * linalg.norm(w) ** 2
 
 def logistic_loss(datum, w):
 	(x, y) = datum
@@ -68,9 +69,12 @@ def derivative(datum, w):
 	return  ((-float(y))/deno) * numpy.array(x) 
 
 def SGD(dataset, stepsize_constant, lambda_):
+	print "Starting SGD algorithm with stepsize_constant: " + str(stepsize_constant) + " lambda: " + str(lambda_)
 	random.shuffle(dataset)
 	init = rn.normal(size=(1, len(dataset[0][0])))[0]
 	w = scale_w(lambda_, init)
+	errors = []
+	errors.append(total_error(w, lambda_, dataset))
 	for i in range(0, len(dataset)):
 		datum = dataset[i]
 		# Stepsize is current c / sqrtroot(t)
@@ -79,7 +83,11 @@ def SGD(dataset, stepsize_constant, lambda_):
 		delta = stepsize * numpy.array(delta)
 		w = w - delta
 		w = scale_w(lambda_, w)
-	return w
+		if i < 100 :
+			#Bottle neck right now
+			errors.append(total_error(w, lambda_, dataset))
+	print "Final w from SGD is " + str(w)
+	return (w, errors)
 
 
 def main():
@@ -88,8 +96,10 @@ def main():
 		return
 	filename = sys.argv[1]	
 	(wstar, data) = load_data(filename)
-	result = SGD(data, 1, 1)
-	print "Final w from SGD is " + str(result)
+	(result, errors) = SGD(data, 1, 1)
 	count_errors(result, data)
+	plt.plot(errors)
+	plt.ylabel('Errors')
+	plt.show()
 
 main()
