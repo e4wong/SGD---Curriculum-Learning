@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import sys
 import random
 import math
+import copy
 
 x = []
 y = []
@@ -38,6 +39,10 @@ def load_data(filename):
 		ds.append((features,sign))
 	print "Done loading data"
 	return (wstar,ds)
+
+
+def calc_error_rate(wstar, dataset):
+	return float(count_errors(wstar, dataset))/ float(len(dataset))
 
 def count_errors(wstar, dataset):
 	errors = 0
@@ -77,6 +82,7 @@ def logistic_loss(datum, w):
 	return numpy.log(1 + numpy.exp(xp))
 
 def scale_w(lambda_, w):
+	# if lambda = .001 , then 1/.001 causes overflow when we do e^ in derivative
 	mag = float(1)/ float(lambda_)
 	if linalg.norm(w) > mag:
 		w = (1.0/linalg.norm(w)) * (1.0/float(lambda_))  * numpy.array(w)
@@ -87,14 +93,27 @@ def derivative(datum, w):
 	deno = 1.0 + numpy.exp(y * numpy.dot(x, w))
 	return  ((-float(y))/deno) * numpy.array(x) 
 
+def dotproduct(v1, v2):
+ 	return sum((a*b) for a, b in zip(v1, v2))
+
+def length(v):
+	return math.sqrt(dotproduct(v, v))
+
+def angle(v1, v2):
+	return math.acos(dotproduct(v1, v2) / (length(v1) * length(v2)))
+
+def cos(val):
+	return math.cos(val)
+
 def stepsize_fn(c, lambda_, t):
 	config = 1
 	if config == 1:
 		return float(c) / float(lambda_ * t)
 	else:
 		return float(c) / numpy.sqrt(t)
+
 def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set):
-	print "Starting SGD algorithm with stepsize_constant: " + str(stepsize_constant) + " lambda: " + str(lambda_)
+	#print "Starting SGD algorithm with stepsize_constant: " + str(stepsize_constant) + " lambda: " + str(lambda_)
 	init = rn.normal(size=(1, len(training_set[0][0])))[0]
 	w = scale_w(lambda_, init)
 	errors = []
@@ -110,12 +129,12 @@ def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set):
 		if error_log and i % len(training_set) / 1000 == 0 :
 			#Bottle neck right now
 			errors.append(total_error_matrix_optimize(w, lambda_, validation_set))
-	print "Final w from SGD is " + str(w)
+	#print "Final w from SGD is " + str(w) + "\n"
 	return (w, errors)
 
-def run_SGD(training_set, validation_set, stepsize_constant):
+def run_SGD(training_set, validation_set, stepsize_constant, plot):
 	# configurations of lambda
-	exponents = [-3, -2, -1, 0]
+	exponents = [-2, -1, 0]
 	base = 10
 	
 	#defaults to compare to
@@ -128,24 +147,75 @@ def run_SGD(training_set, validation_set, stepsize_constant):
 		if mistakes < best_mistakes:
 			best_mistakes = mistakes
 			best_lambda = curr_lambda
-	return SGD(training_set, stepsize_constant, best_lambda, True, validation_set)
+	return SGD(training_set, stepsize_constant, best_lambda, plot, validation_set)
+
+def sort_data(sort_by, data, w_star):
+	# sanity check, should always be hard or easy
+	if not(sort_by == "hard") and not(sort_by == "easy"):
+		print "Something went wrong!!!!!!!"
+		return [] 
+
+	data_hardness = []
+	for (features, label) in data:
+		cos_val = cos(angle(w_star,features))
+		data_hardness.append(((features,label), abs(cos_val)))
+
+	data_hardness.sort(key=lambda tup: tup[1])
+
+	# Hard means that hard examples come first, which means the lower abs(cos_val) are first in the list
+	# Easy means that easy examples come first, which means the higher abs(cos_val) are first in the list
+	if sort_by == "easy":
+		data_hardness.reverse()
+	
+	return data_hardness
+
+def curriculum_learning(sort_by, times_to_run, original_data, w_star):
+	error_rate = []
+	for i in range(0, times_to_run):
+		data = copy.deepcopy(original_data)
+		random.shuffle(data)
+		training_set = data[len(data)/2 : ]
+		validation_set = data[ : len(data)/2]
+		training_set_hardness = sort_data(sort_by, training_set, w_star)
+		train = [data for (data, hardness) in training_set_hardness]
+		(w, errors) = run_SGD(train, validation_set, 1, False)
+		error_rate.append(calc_error_rate(w, validation_set))
+	return error_rate
 
 def main():
-	if len(sys.argv) != 2:
+	if len(sys.argv) < 2:
 		print "Please enter a file"
 		return
-	filename = sys.argv[1]	
-	(wstar, data) = load_data(filename)
+	elif len(sys.argv) == 2:
+		filename = sys.argv[1]	
+		(wstar, data) = load_data(filename)
 
-	random.shuffle(data)
+		random.shuffle(data)
 
-	training_set = data[len(data)/2 : ]
-	validation_set = data[ : len(data)/2]
+		training_set = data[len(data)/2 : ]
+		validation_set = data[ : len(data)/2]
 	
-	(result, errors) = run_SGD(training_set, validation_set, 1)
-	print "Validation_set Accuracy: " + str(float(count_errors(result, validation_set))/len(validation_set))
-	plt.plot(errors)
-	plt.ylabel('Errors')
-	plt.show()
+		(result, errors) = run_SGD(training_set, validation_set, 1, True)
+		print "Validation Set Error Rate: " + str(float(count_errors(result, validation_set))/len(validation_set))
 
+		plt.plot(errors[10:])
+		plt.ylabel('Errors')
+		plt.show()
+
+	elif len(sys.argv) == 3:
+		filename = sys.argv[1]	
+		(wstar, data) = load_data(filename)
+
+		num_runs = int(sys.argv[2])		
+		print "Curriculum learning, Number of iterations for both hard and easy to run:", num_runs 
+		hard_error_rate = curriculum_learning("hard", num_runs, data, wstar)
+		easy_error_rate = curriculum_learning("easy", num_runs, data, wstar)
+		plt.plot(hard_error_rate)
+	 	plt.plot(easy_error_rate)
+		plt.legend(['Hard Examples First', 'Easy Examples First'], loc='upper left')
+		plt.ylabel('Errors')
+		plt.show()
+
+	else:
+		print "Wrong number of arguments"
 main()
