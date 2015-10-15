@@ -106,7 +106,7 @@ def cos(val):
 	return math.cos(val)
 
 def stepsize_fn(c, lambda_, t):
-	config = 1
+	config = 2
 	if config == 1:
 		return float(c) / float(lambda_ * t)
 	else:
@@ -151,7 +151,7 @@ def run_SGD(training_set, validation_set, stepsize_constant, plot):
 
 def sort_data(sort_by, data, w_star):
 	# sanity check, should always be hard or easy
-	if not(sort_by == "hard") and not(sort_by == "easy"):
+	if not(sort_by == "hard") and not(sort_by == "easy") and not(sort_by == "random"):
 		print "Something went wrong!!!!!!!"
 		return [] 
 
@@ -160,7 +160,8 @@ def sort_data(sort_by, data, w_star):
 		cos_val = cos(angle(w_star,features))
 		data_hardness.append(((features,label), abs(cos_val)))
 
-	data_hardness.sort(key=lambda tup: tup[1])
+	if not(sort_by == "random"):
+		data_hardness.sort(key=lambda tup: tup[1])
 
 	# Hard means that hard examples come first, which means the lower abs(cos_val) are first in the list
 	# Easy means that easy examples come first, which means the higher abs(cos_val) are first in the list
@@ -171,6 +172,7 @@ def sort_data(sort_by, data, w_star):
 
 def curriculum_learning(sort_by, times_to_run, original_data, w_star):
 	error_rate = []
+	abs_cos_val = []
 	for i in range(0, times_to_run):
 		data = copy.deepcopy(original_data)
 		random.shuffle(data)
@@ -180,7 +182,8 @@ def curriculum_learning(sort_by, times_to_run, original_data, w_star):
 		train = [data for (data, hardness) in training_set_hardness]
 		(w, errors) = run_SGD(train, validation_set, 1, False)
 		error_rate.append(calc_error_rate(w, validation_set))
-	return error_rate
+		abs_cos_val.append(cos(angle(w,w_star)))
+	return (error_rate, abs_cos_val)
 
 def main():
 	if len(sys.argv) < 2:
@@ -208,12 +211,22 @@ def main():
 
 		num_runs = int(sys.argv[2])		
 		print "Curriculum learning, Number of iterations for both hard and easy to run:", num_runs 
-		hard_error_rate = curriculum_learning("hard", num_runs, data, wstar)
-		easy_error_rate = curriculum_learning("easy", num_runs, data, wstar)
+		(hard_error_rate, hard_cos_val) = curriculum_learning("hard", num_runs, data, wstar)
+		(easy_error_rate, easy_cos_val) = curriculum_learning("easy", num_runs, data, wstar)
+		(random_error_rate, random_cos_val) = curriculum_learning("random", num_runs, data, wstar)
+		plt.figure(0)
 		plt.plot(hard_error_rate)
 	 	plt.plot(easy_error_rate)
-		plt.legend(['Hard Examples First', 'Easy Examples First'], loc='upper left')
-		plt.ylabel('Errors')
+	 	plt.plot(random_error_rate)
+		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='upper left')
+		plt.ylabel('Error Rate')
+
+		plt.figure(1)
+		plt.plot(hard_cos_val)
+		plt.plot(easy_cos_val)
+		plt.plot(random_cos_val)
+		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='lower right')
+		plt.ylabel("Abs(Cos(w,w*))")
 		plt.show()
 
 	else:
