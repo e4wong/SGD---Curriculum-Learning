@@ -9,6 +9,11 @@ import copy
 x = []
 y = []
 
+exponents = [-3,-2, -1, 0]
+base = 10
+
+stepsize_constant_var = 1
+
 def load_data(filename):
 	global x
 	global y
@@ -106,7 +111,7 @@ def cos(val):
 	return math.cos(val)
 
 def stepsize_fn(c, lambda_, t):
-	config = 2
+	config = 1
 	if config == 1:
 		return float(c) / float(lambda_ * t)
 	else:
@@ -132,10 +137,10 @@ def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set):
 	#print "Final w from SGD is " + str(w) + "\n"
 	return (w, errors)
 
-def run_SGD(training_set, validation_set, stepsize_constant, plot):
+def find_lambda(training_set, validation_set, stepsize_constant):
 	# configurations of lambda
-	exponents = [-2, -1, 0]
-	base = 10
+	global exponents
+	global base 
 	
 	#defaults to compare to
 	best_mistakes = len(validation_set)
@@ -147,6 +152,10 @@ def run_SGD(training_set, validation_set, stepsize_constant, plot):
 		if mistakes < best_mistakes:
 			best_mistakes = mistakes
 			best_lambda = curr_lambda
+	return best_lambda
+
+def run_SGD(training_set, validation_set, stepsize_constant, plot):
+	best_lambda = find_lambda(training_set,validation_set, stepsize_constant)
 	return SGD(training_set, stepsize_constant, best_lambda, plot, validation_set)
 
 def sort_data(sort_by, data, w_star):
@@ -171,8 +180,16 @@ def sort_data(sort_by, data, w_star):
 	return data_hardness
 
 def curriculum_learning(sort_by, times_to_run, original_data, w_star):
+	global stepsize_constant_var
 	error_rate = []
 	abs_cos_val = []
+	data = copy.deepcopy(original_data)
+	random.shuffle(data)
+	training_set = data[len(data)/2 : ]
+	validation_set = data[ : len(data)/2]
+
+	lambda_ = find_lambda(training_set,validation_set, stepsize_constant_var)
+
 	for i in range(0, times_to_run):
 		data = copy.deepcopy(original_data)
 		random.shuffle(data)
@@ -180,7 +197,7 @@ def curriculum_learning(sort_by, times_to_run, original_data, w_star):
 		validation_set = data[ : len(data)/2]
 		training_set_hardness = sort_data(sort_by, training_set, w_star)
 		train = [data for (data, hardness) in training_set_hardness]
-		(w, errors) = run_SGD(train, validation_set, 1, False)
+		(w, errors) = SGD(train, stepsize_constant_var, lambda_, False, validation_set)
 		error_rate.append(calc_error_rate(w, validation_set))
 		abs_cos_val.append(cos(angle(w,w_star)))
 	return (error_rate, abs_cos_val)
@@ -214,6 +231,9 @@ def main():
 		(hard_error_rate, hard_cos_val) = curriculum_learning("hard", num_runs, data, wstar)
 		(easy_error_rate, easy_cos_val) = curriculum_learning("easy", num_runs, data, wstar)
 		(random_error_rate, random_cos_val) = curriculum_learning("random", num_runs, data, wstar)
+		
+		print "Error Rate of w*:", calc_error_rate(wstar, data)
+
 		plt.figure(0)
 		plt.plot(hard_error_rate)
 	 	plt.plot(easy_error_rate)
@@ -228,7 +248,7 @@ def main():
 		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='lower right')
 		plt.ylabel("Abs(Cos(w,w*))")
 		plt.show()
-
+		
 	else:
 		print "Wrong number of arguments"
 main()
