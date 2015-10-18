@@ -176,31 +176,32 @@ def sort_data(sort_by, data, w_star):
 	# Easy means that easy examples come first, which means the higher abs(cos_val) are first in the list
 	if sort_by == "easy":
 		data_hardness.reverse()
-	
-	return data_hardness
+	train = [data for (data, hardness) in data_hardness]	
+	return train
 
-def curriculum_learning(sort_by, times_to_run, original_data, w_star):
+def curriculum_learning(sort_by, times_to_run, original_data, w_star, lambda_):
 	global stepsize_constant_var
 	error_rate = []
 	abs_cos_val = []
-	data = copy.deepcopy(original_data)
-	random.shuffle(data)
-	training_set = data[len(data)/2 : ]
-	validation_set = data[ : len(data)/2]
-
-	lambda_ = find_lambda(training_set,validation_set, stepsize_constant_var)
 
 	for i in range(0, times_to_run):
 		data = copy.deepcopy(original_data)
 		random.shuffle(data)
 		training_set = data[len(data)/2 : ]
 		validation_set = data[ : len(data)/2]
-		training_set_hardness = sort_data(sort_by, training_set, w_star)
-		train = [data for (data, hardness) in training_set_hardness]
-		(w, errors) = SGD(train, stepsize_constant_var, lambda_, False, validation_set)
+		training_set = sort_data(sort_by, training_set, w_star)
+		(w, errors) = SGD(training_set, stepsize_constant_var, lambda_, False, validation_set)
 		error_rate.append(calc_error_rate(w, validation_set))
 		abs_cos_val.append(cos(angle(w,w_star)))
 	return (error_rate, abs_cos_val)
+
+def trace_objective_function_CL(sort_by, data, lambda_, w_star):
+	random.shuffle(data)
+	training_set = data[len(data)/2 : ]
+	validation_set = data[ : len(data)/2]
+	training_set = sort_data(sort_by, training_set, w_star)
+	(w, obj_plot) = SGD(training_set, stepsize_constant_var, lambda_, True, validation_set)
+	return obj_plot
 
 def main():
 	if len(sys.argv) < 2:
@@ -228,9 +229,14 @@ def main():
 
 		num_runs = int(sys.argv[2])		
 		print "Curriculum learning, Number of iterations for both hard and easy to run:", num_runs 
-		(hard_error_rate, hard_cos_val) = curriculum_learning("hard", num_runs, data, wstar)
-		(easy_error_rate, easy_cos_val) = curriculum_learning("easy", num_runs, data, wstar)
-		(random_error_rate, random_cos_val) = curriculum_learning("random", num_runs, data, wstar)
+		
+		random.shuffle(data)
+		training_set = data[len(data)/2 : ]
+		validation_set = data[ : len(data)/2]
+		lambda_ = find_lambda(training_set,validation_set, stepsize_constant_var)
+		(hard_error_rate, hard_cos_val) = curriculum_learning("hard", num_runs, data, wstar, lambda_)
+		(easy_error_rate, easy_cos_val) = curriculum_learning("easy", num_runs, data, wstar, lambda_)
+		(random_error_rate, random_cos_val) = curriculum_learning("random", num_runs, data, wstar, lambda_)
 		
 		print "Error Rate of w*:", calc_error_rate(wstar, data)
 
@@ -247,8 +253,20 @@ def main():
 		plt.plot(random_cos_val)
 		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='lower right')
 		plt.ylabel("Abs(Cos(w,w*))")
-		plt.show()
-		
+	
+		obj_plot_hard = trace_objective_function_CL("hard", data, lambda_, wstar)
+		obj_plot_easy = trace_objective_function_CL("easy", data, lambda_, wstar)
+		obj_plot_random = trace_objective_function_CL("random", data, lambda_, wstar)
+
+
+		plt.figure(2)
+		plt.plot(obj_plot_hard)
+		plt.plot(obj_plot_easy)
+		plt.plot(obj_plot_random)
+		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='lower right')
+		plt.ylabel("Objective Function Value")
+
+		plt.show()	
 	else:
 		print "Wrong number of arguments"
 main()
