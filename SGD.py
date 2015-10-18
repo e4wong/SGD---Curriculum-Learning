@@ -9,7 +9,7 @@ import copy
 x = []
 y = []
 
-exponents = [-3,-2, -1, 0]
+exponents = [-2, -1, 0]
 base = 10
 
 stepsize_constant_var = 1
@@ -131,7 +131,7 @@ def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set):
 		delta = stepsize * numpy.array(delta)
 		w = w - delta
 		w = scale_w(lambda_, w)
-		if error_log and i % len(training_set) / 1000 == 0 :
+		if error_log and (i % 10) == 0:
 			#Bottle neck right now
 			errors.append(total_error_matrix_optimize(w, lambda_, validation_set))
 	#print "Final w from SGD is " + str(w) + "\n"
@@ -210,17 +210,16 @@ def main():
 	elif len(sys.argv) == 2:
 		filename = sys.argv[1]	
 		(wstar, data) = load_data(filename)
-
 		random.shuffle(data)
 
 		training_set = data[len(data)/2 : ]
 		validation_set = data[ : len(data)/2]
 	
-		(result, errors) = run_SGD(training_set, validation_set, 1, True)
-		print "Validation Set Error Rate: " + str(float(count_errors(result, validation_set))/len(validation_set))
-
-		plt.plot(errors[10:])
-		plt.ylabel('Errors')
+		(result, errors) = run_SGD(training_set, validation_set, stepsize_constant_var, True)
+		print "Validation Set Error Rate: " + str(calc_error_rate(result, validation_set))
+		print "Final w from SGD: " + str(result)
+		plt.plot(errors)
+		plt.ylabel('Objective Function')
 		plt.show()
 
 	elif len(sys.argv) == 3:
