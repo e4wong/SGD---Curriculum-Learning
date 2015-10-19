@@ -23,9 +23,12 @@ def load_features(fn):
 	features = []
 	magic_number = read(f, 4)
 	num_images = read(f, 4)
+	num_rows = read(f, 4)
+	num_columns = read(f, 4)
+	total = num_rows * num_columns
 	for i in range(0, num_images):
 		feature = []
-		for j in range(0, 255):
+		for j in range(0, total):
 			feature.append(read(f,1))
 		features.append(feature)
 	return features
@@ -34,7 +37,7 @@ def print_formatted_data(features,labels,label1, label2):
 	if not(len(features) == len(labels)):
 		print "Something went wrong"
 		return
-	wstar = [0] * 255
+	wstar = [0] * 784
 	wstarconfig = "//w* is " + str(wstar)
 	wstarconfig = wstarconfig.replace("\n", "")
 	wstarconfig = wstarconfig.replace(",", "")
@@ -55,6 +58,6 @@ def print_formatted_data(features,labels,label1, label2):
 def main():
 	labels = load_labels("train-labels-idx1-ubyte")
 	features = load_features("train-images-idx3-ubyte")
-	print_formatted_data(features, labels, 1, 8)
+	print_formatted_data(features, labels, 1, 3)
 
 main()

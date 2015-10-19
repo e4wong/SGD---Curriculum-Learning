@@ -5,6 +5,7 @@ import sys
 import random
 import math
 import copy
+from sklearn.linear_model import SGDClassifier
 
 x = []
 y = []
@@ -45,6 +46,13 @@ def load_data(filename):
 	print "Done loading data"
 	return (wstar,ds)
 
+default_output_file = "output"
+def output_final_w(wstar):
+	f = open(default_output_file,'w')
+	wstarconfig = "//w* is " + str(wstar)
+	wstarconfig = wstarconfig.replace("\n", "")
+	wstarconfig = wstarconfig.replace(",", "")
+	f.write(wstarconfig)
 
 def calc_error_rate(wstar, dataset):
 	return float(count_errors(wstar, dataset))/ float(len(dataset))
@@ -131,7 +139,7 @@ def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set):
 		delta = stepsize * numpy.array(delta)
 		w = w - delta
 		w = scale_w(lambda_, w)
-		if error_log and (i % 10) == 0:
+		if error_log and (i % 100) == 0:
 			#Bottle neck right now
 			errors.append(total_error_matrix_optimize(w, lambda_, validation_set))
 	#print "Final w from SGD is " + str(w) + "\n"
@@ -214,10 +222,10 @@ def main():
 
 		training_set = data[len(data)/2 : ]
 		validation_set = data[ : len(data)/2]
-	
+
 		(result, errors) = run_SGD(training_set, validation_set, stepsize_constant_var, True)
 		print "Validation Set Error Rate: " + str(calc_error_rate(result, validation_set))
-		print "Final w from SGD: " + str(result)
+		output_final_w(result)
 		plt.plot(errors)
 		plt.ylabel('Objective Function')
 		plt.show()
@@ -233,8 +241,11 @@ def main():
 		training_set = data[len(data)/2 : ]
 		validation_set = data[ : len(data)/2]
 		lambda_ = find_lambda(training_set,validation_set, stepsize_constant_var)
+		print "Running Hard->Easy"
 		(hard_error_rate, hard_cos_val) = curriculum_learning("hard", num_runs, data, wstar, lambda_)
+		print "Running Easy->Hard"
 		(easy_error_rate, easy_cos_val) = curriculum_learning("easy", num_runs, data, wstar, lambda_)
+		print "Running Random"
 		(random_error_rate, random_cos_val) = curriculum_learning("random", num_runs, data, wstar, lambda_)
 		
 		print "Error Rate of w*:", calc_error_rate(wstar, data)
@@ -253,15 +264,18 @@ def main():
 		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='lower right')
 		plt.ylabel("Abs(Cos(w,w*))")
 	
+		print "Tracing Hard->Easy"
 		obj_plot_hard = trace_objective_function_CL("hard", data, lambda_, wstar)
+		print "Tracing Easy->Hard"
 		obj_plot_easy = trace_objective_function_CL("easy", data, lambda_, wstar)
+		print "Tracing Random"
 		obj_plot_random = trace_objective_function_CL("random", data, lambda_, wstar)
 
 
 		plt.figure(2)
-		plt.plot(obj_plot_hard)
-		plt.plot(obj_plot_easy)
-		plt.plot(obj_plot_random)
+		plt.plot(obj_plot_hard[10:])
+		plt.plot(obj_plot_easy[10:])
+		plt.plot(obj_plot_random[10:])
 		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='lower right')
 		plt.ylabel("Objective Function Value")
 
