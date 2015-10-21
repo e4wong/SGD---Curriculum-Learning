@@ -1,4 +1,5 @@
 import struct
+import sys
 
 
 def read(fn, size):
@@ -60,9 +61,9 @@ def main():
 	features = load_features("train-images-idx3-ubyte")
 	label_neg = 1
 	label_pos = 3
-	if sys.argv == 3:
-		label_neg = int(argv[1])
-		label_pos = int(argv[2])
+	if len(sys.argv) == 3:
+		label_neg = int(sys.argv[1])
+		label_pos = int(sys.argv[2])
 	print_formatted_data(features, labels, label_neg, label_pos)
 
 main()
