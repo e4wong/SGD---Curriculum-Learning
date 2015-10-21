@@ -125,9 +125,14 @@ def stepsize_fn(c, lambda_, t):
 	else:
 		return float(c) / numpy.sqrt(t)
 
-def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set):
+def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set, init_w=None):
 	#print "Starting SGD algorithm with stepsize_constant: " + str(stepsize_constant) + " lambda: " + str(lambda_)
 	init = rn.normal(size=(1, len(training_set[0][0])))[0]
+
+	if not(init_w is None):
+		init = init_w
+		print "Initialized w for SGD run"
+
 	w = scale_w(lambda_, init)
 	errors = []
 	errors.append(total_error_matrix_optimize(w, lambda_, validation_set))
@@ -139,7 +144,7 @@ def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set):
 		delta = stepsize * numpy.array(delta)
 		w = w - delta
 		w = scale_w(lambda_, w)
-		if error_log and (i % 100) == 0:
+		if error_log and (i % 50) == 0:
 			#Bottle neck right now
 			errors.append(total_error_matrix_optimize(w, lambda_, validation_set))
 	#print "Final w from SGD is " + str(w) + "\n"
@@ -276,7 +281,7 @@ def main():
 		plt.plot(obj_plot_hard[10:])
 		plt.plot(obj_plot_easy[10:])
 		plt.plot(obj_plot_random[10:])
-		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='lower right')
+		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='upper right')
 		plt.ylabel("Objective Function Value")
 
 		plt.show()	

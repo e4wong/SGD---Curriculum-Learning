@@ -58,6 +58,11 @@ def print_formatted_data(features,labels,label1, label2):
 def main():
 	labels = load_labels("train-labels-idx1-ubyte")
 	features = load_features("train-images-idx3-ubyte")
-	print_formatted_data(features, labels, 1, 3)
+	label_neg = 1
+	label_pos = 3
+	if sys.argv == 3:
+		label_neg = int(argv[1])
+		label_pos = int(argv[2])
+	print_formatted_data(features, labels, label_neg, label_pos)
 
 main()
