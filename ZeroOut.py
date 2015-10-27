@@ -75,7 +75,7 @@ def print_dataset(wstar, labeled_data):
 		string += str(label)
 		print string
 
-default_output_file = "hard_examples."
+default_output_file = "HARD."
 def output_hard_examples(filename, labeled_data):
 	f = open(default_output_file + filename,'w')
 	for ((data,label),hard) in labeled_data:
@@ -85,12 +85,9 @@ def output_hard_examples(filename, labeled_data):
 		for dimension in data:
 			string += str(dimension) + " "
 		string += str(label) + "\n"
-		f.write(string)
-		
+		f.write(string)	
 	f.flush()
 	f.close()
-
-
 
 def main():
 	if len(sys.argv) < 2:
