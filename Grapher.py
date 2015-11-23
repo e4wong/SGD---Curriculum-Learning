@@ -1,6 +1,6 @@
 import sys
 import matplotlib.pyplot as plt
-
+import math
 
 def get_array(s):
 	s = s[s.index('[') + 1 : len(s) - 2]
@@ -22,6 +22,20 @@ def load_data(filename):
 		data.append((name, (error_rate, final_obj_val, trace_obj_val)))
 	return data
 
+def calc_mean(data):
+	total = 0.0
+	for value in data:
+		total += value
+	return total / len(data)
+
+def calc_std_dev(data, mean):
+	total = 0.0
+	for value in data:
+		total += (value - mean) ** 2
+	total = total / len(data)
+	return math.sqrt(total)
+
+
 def main():
 	if len(sys.argv) < 2:
 		print "Wrong way to use me!"
@@ -38,13 +52,19 @@ def main():
 			names.append(name)
 			f_0 = plt.figure(0)
 			plt.plot(error_rate)
+			mean_er = calc_mean(error_rate)
+			print name, "Mean Error Rate:", mean_er
+			print name, "Error Rate Standard Deviation:", calc_std_dev(error_rate, mean_er)
 
 			f_1 = plt.figure(1)
 			plt.plot(final_obj_val)
-
+			mean_final_obj_val = calc_mean(final_obj_val)
+			print name, "Mean Final Objective Function Value:", mean_final_obj_val
+			print name, "Final Objective Function Value Standard Deviation:", calc_std_dev(final_obj_val, mean_final_obj_val)
 
 			f_2 = plt.figure(2)
-			plt.plot(trace_obj_val)
+			plt.plot(trace_obj_val[5:])
+			print ""
 
 		f_0 = plt.figure(0)
 		plt.legend(names, loc='upper left')

@@ -476,7 +476,7 @@ def main():
 		final_data.append(("Random Examples First",(random_error_rate, random_objective_func_val, obj_plot_random)))
 		final_data.append(("Just Hard",(jh_error_rate, jh_objective_func_val, obj_plot_jh)))
 		final_data.append(("Just Easy",(je_error_rate, je_objective_func_val, obj_plot_je)))
-		output_final_data(filename, final_data)
+		output_final_data(filename + "_lambda:" + str(lambda_), final_data)
 	
 	else:
 		print "Wrong number of arguments"
