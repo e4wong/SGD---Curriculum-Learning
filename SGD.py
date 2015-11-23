@@ -7,7 +7,7 @@ import math
 import copy
 from sklearn.linear_model import SGDClassifier
 
-exponents = [-2, -1, 0]
+exponents = [-3, -2, -1, 0]
 base = 10
 
 stepsize_constant_var = 1
@@ -62,6 +62,15 @@ def output_final_w(wstar):
 	wstarconfig = wstarconfig.replace("\n", "")
 	wstarconfig = wstarconfig.replace(",", "")
 	f.write(wstarconfig)
+
+
+def output_final_data(fn, data):
+	f = open(fn + ".OUTPUTDATA", 'w')
+	for (label, (error_rate, final_objective_func_val, avg_objective_func_trace)) in data:
+		f.write(label + "\n")
+		f.write(str(error_rate).replace(",", "") + "\n")
+		f.write(str(final_objective_func_val).replace(",", "") + "\n")
+		f.write(str(avg_objective_func_trace).replace(",", "") + "\n")
 
 def calc_error_rate(wstar, dataset):
 	return float(count_errors(wstar, dataset))/ float(len(dataset))
@@ -138,14 +147,15 @@ def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set, ini
 	#print "Starting SGD algorithm with stepsize_constant: " + str(stepsize_constant) + " lambda: " + str(lambda_)
 	init = rn.normal(size=(1, len(training_set[0][0])))[0]
 
-	mod_by = 1
+	mod_by = 20
+	'''
 	if len(training_set) < 2000:
 		mod_by = 2
 	elif len(training_set) < 10000:
 		mod_by = 10
 	else:
 		mod_by = 20
-
+	'''
 	if not(init_w is None):
 		init = init_w
 		print "Initialized w for SGD run"
@@ -194,6 +204,9 @@ def sort_data(sort_by, data, w_star):
 		print "Something went wrong!!!!!!!"
 		return [] 
 
+	if sort_by == "random":
+		return data
+
 	data_hardness = []
 	for (features, label) in data:
 		cos_val = cos(angle(w_star,features))
@@ -211,7 +224,7 @@ def sort_data(sort_by, data, w_star):
 
 def sort_data0(sort_by, data, hard_data):
 	# sanity check, should always be hard or easy
-	if not(sort_by == "hard") and not(sort_by == "easy") and not(sort_by == "random"):
+	if not(sort_by == "hard") and not(sort_by == "easy") and not(sort_by == "random") and not(sort_by == "justeasy") and not(sort_by == "justhard"):
 		print "Something went wrong!!!!!!!"
 		return [] 
 
@@ -219,12 +232,23 @@ def sort_data0(sort_by, data, hard_data):
 		return data
 
 	data_hardness = []
-	for datum in data:
-		if datum in hard_data:
-			data_hardness.append((datum, 1))
-		else:
-			data_hardness.append((datum, 0))
-
+	if sort_by == "justeasy" or sort_by == "justhard":
+		for datum in data:
+			if datum in hard_data:
+				if sort_by == "justeasy":
+					continue
+				data_hardness.append((datum, 1))
+			else:
+				if sort_by == "justhard":
+					continue
+				data_hardness.append((datum, 0))
+	else:
+		for datum in data:
+			if datum in hard_data:
+				data_hardness.append((datum, 1))
+			else:
+				data_hardness.append((datum, 0))
+	
 	data_hardness.sort(key=lambda tup: tup[1])
 	if sort_by == "hard":
 		data_hardness.reverse()
@@ -234,23 +258,50 @@ def sort_data0(sort_by, data, hard_data):
 def curriculum_learning0(sort_by, times_to_run, original_data, hard_data, lambda_):
 	global stepsize_constant_var
 	error_rate = []
-	objective_func_val = []
-	
+	final_objective_func_val = []
+	avg_trace_objective_func_val = []
 	for i in range(0, times_to_run):
 		data = copy.deepcopy(original_data)
 		random.shuffle(data)
 		training_set = data[len(data)/2 : ]
 		validation_set = data[ : len(data)/2]
 		training_set = sort_data0(sort_by, training_set, hard_data)
-		(w, errors) = SGD(training_set, stepsize_constant_var, lambda_, False, validation_set)
-		error_rate.append(calc_error_rate(w, validation_set))
-		objective_func_val.append(total_error(w, lambda_, validation_set))
-	return (error_rate, objective_func_val)
+		(w, errors) = SGD(training_set, stepsize_constant_var, lambda_, True, validation_set)
+		if len(avg_trace_objective_func_val) == 0:
+			avg_trace_objective_func_val = errors
+		else:
+			length = 0.0
+			if len(avg_trace_objective_func_val) < len(errors):
+				length = len(avg_trace_objective_func_val)
+			else:
+				length = len(errors)
+			for i in range(0, length):
+				if avg_trace_objective_func_val[i] == float("inf"):
+					avg_trace_objective_func_val[i] = errors[i]
+				elif errors[i] == float("inf"):
+					continue
+				else:
+					avg_trace_objective_func_val[i] += errors[i]
 
-def curriculum_learning(sort_by, times_to_run, original_data, w_star, lambda_):
+		error_rate.append(calc_error_rate(w, validation_set))
+		final_objective_func_val.append(total_error(w, lambda_, validation_set))
+	for i in range(0, len(avg_trace_objective_func_val)):
+		avg_trace_objective_func_val[i] = avg_trace_objective_func_val[i]/times_to_run
+	return (error_rate, final_objective_func_val, avg_trace_objective_func_val)
+
+
+def curriculum_learning(sort_by, times_to_run, original_data, w_star, lambda_ = None):
 	global stepsize_constant_var
 	error_rate = []
 	abs_cos_val = []
+	if lambda_ is None:
+		data = copy.deepcopy(original_data)
+		random.shuffle(data)
+		training_set = data[len(data)/2 : ]
+		validation_set = data[ : len(data)/2]
+		training_set = sort_data(sort_by, training_set, w_star)
+		lambda_ = find_lambda(training_set,validation_set, stepsize_constant_var)
+	print "Lambda for", sort_by, "is", lambda_
 
 	for i in range(0, times_to_run):
 		data = copy.deepcopy(original_data)
@@ -262,6 +313,16 @@ def curriculum_learning(sort_by, times_to_run, original_data, w_star, lambda_):
 		error_rate.append(calc_error_rate(w, validation_set))
 		abs_cos_val.append(cos(angle(w,w_star)))
 	return (error_rate, abs_cos_val)
+
+
+def trace_objective_function_CL0(sort_by, data, lambda_, hard_data):
+	random.shuffle(data)
+	training_set = data[len(data)/2 : ]
+	validation_set = data[ : len(data)/2]
+	training_set = sort_data0(sort_by, training_set, hard_data)
+	(w, obj_plot) = SGD(training_set, stepsize_constant_var, lambda_, True, validation_set)
+	return obj_plot
+
 
 def trace_objective_function_CL(sort_by, data, lambda_, w_star):
 	random.shuffle(data)
@@ -301,6 +362,7 @@ def main():
 		training_set = data[len(data)/2 : ]
 		validation_set = data[ : len(data)/2]
 		lambda_ = find_lambda(training_set,validation_set, stepsize_constant_var)
+		print "Lambda:", lambda_
 		print "Running Hard->Easy"
 		(hard_error_rate, hard_cos_val) = curriculum_learning("hard", num_runs, data, wstar, lambda_)
 		print "Running Easy->Hard"
@@ -359,12 +421,17 @@ def main():
 		validation_set = data[ : len(data)/2]
 	
 		lambda_ = find_lambda(training_set,validation_set, stepsize_constant_var)
+		print "Lambda:", lambda_
 		print "Running Hard->Easy"
-		(hard_error_rate, hard_objective_func_val) = curriculum_learning0("hard", num_runs, data, hard_data, lambda_)
+		(hard_error_rate, hard_objective_func_val, obj_plot_hard) = curriculum_learning0("hard", num_runs, data, hard_data, lambda_)
 		print "Running Easy->Hard"
-		(easy_error_rate, easy_objective_func_val) = curriculum_learning0("easy", num_runs, data, hard_data, lambda_)
+		(easy_error_rate, easy_objective_func_val, obj_plot_easy) = curriculum_learning0("easy", num_runs, data, hard_data, lambda_)
 		print "Running Random"
-		(random_error_rate, random_objective_func_val) = curriculum_learning0("random", num_runs, data, hard_data, lambda_)
+		(random_error_rate, random_objective_func_val, obj_plot_random) = curriculum_learning0("random", num_runs, data, hard_data, lambda_)
+		print "Running Just Hard"
+		(jh_error_rate, jh_objective_func_val, obj_plot_jh) = curriculum_learning0("justhard", num_runs, data, hard_data, lambda_)
+		print "Running Just Easy"
+		(je_error_rate, je_objective_func_val, obj_plot_je) = curriculum_learning0("justeasy", num_runs, data, hard_data, lambda_)
 
 
 		f_0 = plt.figure(0)
@@ -372,7 +439,9 @@ def main():
 		plt.plot(hard_error_rate)
 	 	plt.plot(easy_error_rate)
 	 	plt.plot(random_error_rate)
-		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='upper left')
+	 	plt.plot(jh_error_rate)
+	 	plt.plot(je_error_rate)
+		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples', 'Just Hard', 'Just Easy'], loc='upper left')
 		plt.ylabel('Error Rate')
 
 		f_1 = plt.figure(1)
@@ -380,10 +449,34 @@ def main():
 		plt.plot(hard_objective_func_val)
 		plt.plot(easy_objective_func_val)
 		plt.plot(random_objective_func_val)
-		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='lower right')
+		plt.plot(jh_objective_func_val)
+		plt.plot(je_objective_func_val)
+
+		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples', 'Just Hard', 'Just Easy'], loc='upper right')
 		plt.ylabel("Final Objective Function Value")
 
+
+		plt.figure(2)
+		f_2 = plt.figure(2)
+		f_2.canvas.set_window_title(filename)
+		plt.plot(obj_plot_hard[5:])
+		plt.plot(obj_plot_easy[5:])
+		plt.plot(obj_plot_random[5:])
+		plt.plot(obj_plot_jh[5:])
+		plt.plot(obj_plot_je[5:])
+		plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples', 'Just Hard', 'Just Easy'], loc='upper right')
+		plt.ylabel("Objective Function Value")
+
 		plt.show()	
+
+		print "Outputting values"
+		final_data = []
+		final_data.append(("Hard Examples First",(hard_error_rate, hard_objective_func_val, obj_plot_hard)))
+		final_data.append(("Easy Examples First",(easy_error_rate, easy_objective_func_val, obj_plot_easy)))
+		final_data.append(("Random Examples First",(random_error_rate, random_objective_func_val, obj_plot_random)))
+		final_data.append(("Just Hard",(jh_error_rate, jh_objective_func_val, obj_plot_jh)))
+		final_data.append(("Just Easy",(je_error_rate, je_objective_func_val, obj_plot_je)))
+		output_final_data(filename, final_data)
 	
 	else:
 		print "Wrong number of arguments"
