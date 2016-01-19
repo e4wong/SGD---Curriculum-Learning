@@ -6,38 +6,13 @@ import random
 import math
 import copy
 from sklearn.linear_model import SGDClassifier
+from library import *
 
 exponents = [-3, -2, -1, 0]
 base = 10
 
 stepsize_constant_var = 1
 
-def load_data(filename):
-	f = open(filename, "r")
-	print "Reading from file " + filename
-	# Data from the UniformDataGenerator.py has the format
-	# such that the first line is w*
-	line = f.readline()
-	line = line[line.index('[') + 1 : len(line) - 2]
-	# Remove the other comment part of the first line of w*
-	tokens = line.split()
-	wstar = []
-	for token in tokens:
-		wstar.append(float(token))
-
-	print "W* is " + str(wstar)
-
-	ds = []
-	for line in f:
-		features = []
-		sign = 0
-		tokens = line.split()
-		for i in range(0, len(tokens) - 1):
-			features.append(float(tokens[i]))
-		sign = int(tokens[len(tokens) -1])
-		ds.append((features,sign))
-	print "Done loading data"
-	return (wstar,ds)
 
 def load_hard_examples(filename):
 	f = open(filename, "r")
@@ -55,15 +30,6 @@ def load_hard_examples(filename):
 	print "Done loading hard data"
 	return hard_data	
 
-default_output_file = "output"
-def output_final_w(wstar):
-	f = open(default_output_file,'w')
-	wstarconfig = "//w* is " + str(wstar)
-	wstarconfig = wstarconfig.replace("\n", "")
-	wstarconfig = wstarconfig.replace(",", "")
-	f.write(wstarconfig)
-
-
 def output_final_data(fn, data):
 	f = open(fn + ".OUTPUTDATA", 'w')
 	for (label, (error_rate, final_objective_func_val, avg_objective_func_trace)) in data:
@@ -72,22 +38,6 @@ def output_final_data(fn, data):
 		f.write(str(final_objective_func_val).replace(",", "") + "\n")
 		f.write(str(avg_objective_func_trace).replace(",", "") + "\n")
 
-def calc_error_rate(wstar, dataset):
-	return float(count_errors(wstar, dataset))/ float(len(dataset))
-
-def count_errors(wstar, dataset):
-	errors = 0
-	num_samples = len(dataset)
-	for (features, label) in dataset:
-		dp = numpy.dot(features, wstar)
-		if dp > 0 and label == -1:
-			errors = errors + 1
-		elif dp < 0 and label == 1:
-			errors = errors + 1
-		elif dp == 0:
-			# just consider this an error, right on decision boundary
-			errors = errors + 1
-	return errors
 
 def total_error_matrix_optimize(w, lambda_, dataset):
 	x = [features for (features, label) in dataset]
@@ -100,17 +50,6 @@ def total_error_matrix_optimize(w, lambda_, dataset):
 	return sum(e_neg_wTx_y)/len(e_neg_wTx_y) + (float(lambda_)/2.0) * linalg.norm(w) ** 2
 
 
-def total_error(w, lambda_, dataset):
-	sum_errors = float(0)
-	for datum in dataset:
-		sum_errors += logistic_loss(datum, w)
-	sum_errors /= len(dataset)
-	return sum_errors + (float(lambda_) / 2.0) * linalg.norm(w) ** 2
-
-def logistic_loss(datum, w):
-	(x, y) = datum
-	xp = -1 * y * numpy.dot(w, x)  
-	return numpy.log(1 + numpy.exp(xp))
 
 def scale_w(lambda_, w):
 	# if lambda = .001 , then 1/.001 causes overflow when we do e^ in derivative
@@ -119,10 +58,6 @@ def scale_w(lambda_, w):
 		w = (1.0/linalg.norm(w)) * (1.0/float(lambda_))  * numpy.array(w)
 	return w
 
-def derivative(datum, w):
-	(x, y) = datum
-	deno = 1.0 + numpy.exp(y * numpy.dot(x, w))
-	return  ((-float(y))/deno) * numpy.array(x) 
 
 def dotproduct(v1, v2):
  	return sum((a*b) for a, b in zip(v1, v2))
@@ -147,7 +82,7 @@ def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set, ini
 	#print "Starting SGD algorithm with stepsize_constant: " + str(stepsize_constant) + " lambda: " + str(lambda_)
 	init = rn.normal(size=(1, len(training_set[0][0])))[0]
 
-	mod_by = 20
+	mod_by = 15
 	'''
 	if len(training_set) < 2000:
 		mod_by = 2
