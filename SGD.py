@@ -82,7 +82,7 @@ def SGD(training_set, stepsize_constant, lambda_, error_log, validation_set, ini
 	#print "Starting SGD algorithm with stepsize_constant: " + str(stepsize_constant) + " lambda: " + str(lambda_)
 	init = rn.normal(size=(1, len(training_set[0][0])))[0]
 
-	mod_by = 15
+	mod_by = 5
 	'''
 	if len(training_set) < 2000:
 		mod_by = 2

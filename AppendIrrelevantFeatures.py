@@ -7,10 +7,13 @@ def generate_irrelevant_features(w_star, data, number_irrelevant_features):
     new_w_star = w_star + [0.0] * number_irrelevant_features
     new_data = []
     for (features, label) in data:
-        new_features = copy.deepcopy(features)
+        ir_features = []
         for i in range(0, number_irrelevant_features):
-            new_features.append(random.uniform(-1.0,1.0))
-        new_data.append((new_features, label))
+            ir_features.append(random.uniform(-1.0,1.0))
+
+        scaling_factor = random.uniform(0.5,1.5)
+        ir_features = [feature * scaling_factor for feature in ir_features]
+        new_data.append((features + ir_features, label))
     return (new_w_star, new_data)
 
 def main():
