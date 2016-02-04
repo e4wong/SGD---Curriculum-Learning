@@ -7,7 +7,7 @@ import math
 import copy
 from library import *
 
-exponents = [-4, -3, -2, -1, 0]
+exponents = [-8, -7, -6, -5, -4, -3, -2, -1, 0]
 base = 10
 stepsize_constant_var = .2
 
@@ -31,11 +31,12 @@ def find_lambda(training_set, validation_set, stepsize_constant):
 
 def output_final_data(fn, data):
     f = open(fn + ".OUTPUTDATA", 'w')
-    for (label, (error_rate, final_objective_func_val, avg_objective_func_trace)) in data:
+    for (label, (error_rate, final_objective_func_val, avg_objective_func_trace, error_rate_trace)) in data:
         f.write(label + "\n")
         f.write(str(error_rate).replace(",", "") + "\n")
         f.write(str(final_objective_func_val).replace(",", "") + "\n")
         f.write(str(avg_objective_func_trace).replace(",", "") + "\n")
+        f.write(str(error_rate_trace).replace(",", "") + "\n")
 
 def run_EGD(training_set, validation_set, stepsize_constant, plot):
     best_lambda = find_lambda(training_set,validation_set, stepsize_constant)
@@ -48,6 +49,8 @@ def get_w(w_plus, w_minus):
 def find_lambda(training_set, validation_set, stepsize_constant):
     global exponents
     global base
+    # no regularization for EGD anymore
+    return 0.0
     best_mistakes = len(validation_set)
     best_lambda = 1.0
     for exp in exponents:
@@ -73,6 +76,7 @@ def EGD(training_set, stepsize_constant, lambda_, error_log, validation_set):
 
     errors = []
     error_rate_trace = []
+    error_rate_trace.append(calc_error_rate(get_w(w_plus, w_minus), validation_set))
     errors.append(total_error(get_w(w_plus, w_minus), lambda_, validation_set))
     for i in range(0, len(training_set)):
         # I think Shuang is using stepsize = 1 currently
@@ -300,11 +304,11 @@ def main():
         plt.show()  
         print "Outputting values"
         final_data = []
-        final_data.append(("Hard Examples First",(hard_error_rate, hard_objective_func_val, obj_plot_hard)))
-        final_data.append(("Easy Examples First",(easy_error_rate, easy_objective_func_val, obj_plot_easy)))
-        final_data.append(("Random Examples First",(random_error_rate, random_objective_func_val, obj_plot_random)))
-        final_data.append(("Hard Half",(hh_error_rate, hh_objective_func_val, obj_plot_hh)))
-        final_data.append(("Easy Half",(eh_error_rate, eh_objective_func_val, obj_plot_eh)))
+        final_data.append(("Hard Examples First",(hard_error_rate, hard_objective_func_val, obj_plot_hard, hard_err_trace)))
+        final_data.append(("Easy Examples First",(easy_error_rate, easy_objective_func_val, obj_plot_easy, easy_err_trace)))
+        final_data.append(("Random Examples First",(random_error_rate, random_objective_func_val, obj_plot_random, random_err_trace)))
+        final_data.append(("Hard Half",(hh_error_rate, hh_objective_func_val, obj_plot_hh, hh_err_trace)))
+        final_data.append(("Easy Half",(eh_error_rate, eh_objective_func_val, obj_plot_eh, eh_err_trace)))
         output_final_data(filename + "_lambda:" + str(lambda_), final_data)
  
 
