@@ -103,21 +103,7 @@ def count_errors(wstar, dataset):
 			errors = errors + 1
 		elif dp < 0 and label == 1:
 			errors = errors + 1
-		elif dp == 0:
-			# just consider this an error, right on decision boundary
-			errors = errors + 1
-	return errors
-
-def count_errors(wstar, dataset):
-	errors = 0
-	num_samples = len(dataset)
-	for (features, label) in dataset:
-		dp = numpy.dot(features, wstar)
-		if dp > 0 and label == -1:
-			errors = errors + 1
-		elif dp < 0 and label == 1:
-			errors = errors + 1
-		elif dp == 0:
-			# just consider this an error, right on decision boundary
+		elif dp == 0 and label == 1:
+			# <= 0 -> -1, so 1 would be an error
 			errors = errors + 1
 	return errors

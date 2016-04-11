@@ -13,7 +13,7 @@ def get_array(s):
 def load_data(filename):
     f = open(filename, "r")
     data = []
-    for i in range(0,5):
+    for i in range(0,3):
         name = next(f).replace("\n", "")
 
         error_rate = get_array(next(f))

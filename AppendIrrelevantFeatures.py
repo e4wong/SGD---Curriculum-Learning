@@ -16,7 +16,7 @@ def generate_irrelevant_features(w_star, data, number_irrelevant_features):
         new_data.append((features + ir_features, label))
     return (new_w_star, new_data)
 
-NUMBER_CORRELATED_FEATURES = 5
+NUMBER_CORRELATED_FEATURES = 0
 def generate_irrelevant_correlated_features(w_star, data, number_irrelevant_features):
     new_w_star = w_star + [0.0] * number_irrelevant_features
     new_data = []

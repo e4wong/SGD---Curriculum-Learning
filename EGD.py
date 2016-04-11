@@ -86,10 +86,15 @@ def find_stepsize(training_set, validation_set):
             best_stepsize = curr_stepsize
     return best_stepsize
 
-def run_EGD(training_set, validation_set, stepsize_constant, plot):
-    best_lambda = find_lambda(training_set,validation_set, stepsize_constant)
-    print "Best Lambda:", best_lambda
-    return EGD(training_set, stepsize_constant, best_lambda, plot, validation_set)
+def run_EGD(training_set, test_set, plot, number_irrelevant_features = 0):
+
+    validation_set = training_set[ len(training_set)/2:]
+    training_set = training_set[ :len(training_set)/2]
+    (l1_norm, stepsize_constant) = tune_l1_norm_stepsize(training_set, validation_set, number_irrelevant_features)
+    print "L1 Norm:", l1_norm
+    print "Stepsize Constant:", stepsize_constant
+
+    return EGD(training_set, stepsize_constant, LAMBDA_ZERO, plot, test_set, l1_norm)
 
 def stepsize_fn(c, t):
     config = 4
@@ -100,7 +105,7 @@ def stepsize_fn(c, t):
     else:
         return float(c) / numpy.sqrt(t)
 
-def EGD(training_set, stepsize_constant, lambda_, error_log, validation_set, l1_norm = 1.0):
+def EGD(training_set, stepsize_constant, lambda_, error_log, test_set, l1_norm = 1.0):
     dimensions = len(training_set[0][0])
     w_plus = [1.0/(2.0 * dimensions)] * dimensions
     w_minus = [1.0/(2.0 * dimensions)] * dimensions
@@ -109,8 +114,11 @@ def EGD(training_set, stepsize_constant, lambda_, error_log, validation_set, l1_
 
     errors = []
     error_rate_trace = []
-    error_rate_trace.append(calc_error_rate(get_w(w_plus, w_minus), validation_set))
-    errors.append(total_error(get_w(w_plus, w_minus), lambda_, validation_set))
+    error_rate_trace.append(calc_error_rate(get_w(w_plus, w_minus), test_set))
+    errors.append(total_error(get_w(w_plus, w_minus), lambda_, test_set))
+
+    # gradient trace
+    w_trace = []
     for i in range(0, len(training_set)):
         # I think Shuang is using stepsize = 1 currently
         stepsize = stepsize_fn(stepsize_constant, i + 1)
@@ -129,18 +137,110 @@ def EGD(training_set, stepsize_constant, lambda_, error_log, validation_set, l1_
 
         w_plus = next_w_plus
         w_minus = next_w_minus
+        w_trace.append(get_w(w_plus, w_minus))
         if error_log and (i % mod_by) == 0:
             #Bottle neck right now
-            errors.append(total_error(get_w(w_plus, w_minus), lambda_, validation_set))
-            error_rate_trace.append(calc_error_rate(get_w(w_plus, w_minus), validation_set))
+            errors.append(total_error(get_w(w_plus, w_minus), lambda_, test_set))
+            error_rate_trace.append(calc_error_rate(get_w(w_plus, w_minus), test_set))
     w_final = get_w(w_plus, w_minus)
-    return (w_final, (errors, error_rate_trace))
+    return (w_final, (errors, error_rate_trace, w_trace))
 
 def magnitude_irrelevant_features(number_irrelevant_features, features):
     total = 0.0
     for i in range(len(features) - number_irrelevant_features, len(features)):
         total = total + abs(features[i])
     return total
+
+def dotproduct(v1, v2):
+     return sum((a*b) for a, b in zip(v1, v2))
+
+def infinity_norm(l):
+    max_abs = 0.0
+    for val in l:
+        if abs(val) >= max_abs:
+            max_abs = abs(val)
+    return max_abs
+
+def analysis_equation(data, wstar):
+    (features, label) = data
+    return infinity_norm(features)/(1 + numpy.exp(label * numpy.dot(features, wstar)))
+
+def sort_data_analysis_equation(sort_by, data, wstar):
+    # sanity check, should always be hard or easy
+    if not(sort_by == "hard") and not(sort_by == "easy") and not(sort_by == "random") and not(sort_by == "hardhalf") and not(sort_by == "easyhalf"):
+        print "Something went wrong!!!!!!!"
+        return [] 
+
+    if sort_by == "random":
+        return data
+
+    data_hardness = []
+    for (features, label) in data:
+        data_hardness.append(((features,label), analysis_equation((features, label), wstar)))
+
+
+    data_hardness.sort(key=lambda tup: tup[1])
+
+    if sort_by == "hard" or sort_by == "hardhalf":
+        data_hardness.reverse()
+
+    train = [data for (data, hardness) in data_hardness]    
+
+    if sort_by == "easyhalf" or sort_by == "hardhalf":
+        return train[ :len(train)/2]
+    return train
+
+
+
+
+def sort_data_inf_norm(sort_by, data):
+    # sanity check, should always be hard or easy
+    if not(sort_by == "hard") and not(sort_by == "easy") and not(sort_by == "random") and not(sort_by == "hardhalf") and not(sort_by == "easyhalf"):
+        print "Something went wrong!!!!!!!"
+        return [] 
+
+    if sort_by == "random":
+        return data
+
+    data_hardness = []
+    for (features, label) in data:
+        data_hardness.append(((features,label), infinity_norm(features)))
+
+    data_hardness.sort(key=lambda tup: tup[1])
+
+    if sort_by == "hard" or sort_by == "hardhalf":
+        data_hardness.reverse()
+
+    train = [data for (data, hardness) in data_hardness]    
+
+    if sort_by == "easyhalf" or sort_by == "hardhalf":
+        return train[ :len(train)/2]
+    return train
+
+
+def sort_data_margin(sort_by, data, wstar):
+    # sanity check, should always be hard or easy
+    if not(sort_by == "hard") and not(sort_by == "easy") and not(sort_by == "random") and not(sort_by == "hardhalf") and not(sort_by == "easyhalf"):
+        print "Something went wrong!!!!!!!"
+        return [] 
+
+    if sort_by == "random":
+        return data
+
+    data_hardness = []
+    for (features, label) in data:
+        data_hardness.append(((features,label), dotproduct(features, wstar) * label))
+
+    data_hardness.sort(key=lambda tup: tup[1])
+
+    if sort_by == "easy" or sort_by == "easyhalf":
+        data_hardness.reverse()
+
+    train = [data for (data, hardness) in data_hardness]    
+
+    if sort_by == "easyhalf" or sort_by == "hardhalf":
+        return train[ :len(train)/2]
+    return train
 
 
 def sort_data(sort_by, data, number_irrelevant_features):
@@ -206,17 +306,22 @@ def tune_l1_norm_stepsize(training_set, validation_set, number_irrelevant_featur
                 best_stepsize = curr_stepsize
     return (best_l1_norm, best_stepsize)
 
-def curriculum_learning(sort_by, times_to_run, original_data, number_irrelevant_features, lambda_ = LAMBDA_ZERO, stepsize_constant = None, l1_norm = None):
+def curriculum_learning(sort_by, times_to_run, original_data, number_irrelevant_features, wstar, lambda_ = LAMBDA_ZERO, stepsize_constant = None, l1_norm = None, test_set = None):
     global stepsize_constant_var
     error_rate = []
     final_objective_func_val = []
     avg_trace_objective_func_val = []
     avg_error_rate_trace = []
+    history_error_trace = []
+    avg_w_trace = []
 
     data = copy.deepcopy(original_data)
     random.shuffle(data)
     training_set = data[len(data)/2 : ]
-    training_set = sort_data(sort_by, training_set, number_irrelevant_features)
+   # training_set = sort_data(sort_by, training_set, number_irrelevant_features)
+    #training_set = sort_data_margin(sort_by, training_set, wstar)
+    training_set = sort_data_inf_norm(sort_by, training_set)
+    #training_set = sort_data_analysis_equation(sort_by, training_set, wstar)
     validation_set = data[ : len(data)/2]
 
     if stepsize_constant is None and l1_norm is None:
@@ -236,13 +341,30 @@ def curriculum_learning(sort_by, times_to_run, original_data, number_irrelevant_
         random.shuffle(data)
         training_set = data[len(data)/2 : ]
         validation_set = data[ : len(data)/2]
-        training_set = sort_data(sort_by, training_set, number_irrelevant_features)
-        (w, (errors, error_rate_trace)) = EGD(training_set, stepsize_constant, lambda_, True, validation_set, l1_norm)
+       # training_set = sort_data(sort_by, training_set, number_irrelevant_features)
+        #training_set = sort_data_margin(sort_by, training_set, wstar)
+        training_set = sort_data_inf_norm(sort_by, training_set)
+        #training_set = sort_data_analysis_equation(sort_by, training_set, wstar)
+
+        (w, (errors, error_rate_trace, w_trace)) = EGD(training_set, stepsize_constant, lambda_, True, test_set, l1_norm)
+
+        if len(avg_w_trace) == 0:
+            avg_w_trace = w_trace
+        elif len(avg_w_trace) == len(w_trace):
+            tmp = [map(sum, zip(avg_w_trace[i], w_trace[i])) for i in range(0, len(w_trace))]
+            avg_w_trace = tmp
+        else:
+            print "uh oh visit this problem"
+
         if len(avg_error_rate_trace) == 0:
             avg_error_rate_trace = error_rate_trace
+            for val in error_rate_trace:
+                history_error_trace.append([val])
         elif len(avg_error_rate_trace) == len(error_rate_trace):
             tmp = [avg_error_rate_trace[i] + error_rate_trace[i] for i in range(0, len(avg_error_rate_trace))]
             avg_error_rate_trace = tmp
+            for i in range(0, len(error_rate_trace)):
+                history_error_trace[i].append(error_rate_trace[i])
         else:
             print "Visit this problem"
 
@@ -260,16 +382,19 @@ def curriculum_learning(sort_by, times_to_run, original_data, number_irrelevant_
                 elif errors[i] == float("inf"):
                     continue
                 else:
-                    avg_trace_objective_func_val[i] += errors[i]        
-        error_rate.append(calc_error_rate(w, validation_set))
-        final_objective_func_val.append(total_error(w, lambda_, validation_set))
+                    avg_trace_objective_func_val[i] += errors[i]    
+        error_rate.append(calc_error_rate(w, test_set))
+        final_objective_func_val.append(total_error(w, lambda_, test_set))
     for i in range(0, len(avg_error_rate_trace)):
         avg_error_rate_trace[i] = avg_error_rate_trace[i]/times_to_run
     for i in range(0, len(avg_trace_objective_func_val)):
         avg_trace_objective_func_val[i] = avg_trace_objective_func_val[i]/times_to_run
 
+    avg_w_trace = [w[0]/times_to_run for w in avg_w_trace]
+
     print "" #delimiter
-    return (error_rate, final_objective_func_val, avg_trace_objective_func_val, avg_error_rate_trace)
+    std_dev_err_avg_trace = [numpy.std(er) for er in history_error_trace]
+    return (error_rate, final_objective_func_val, avg_trace_objective_func_val, avg_error_rate_trace, avg_w_trace)
 
 def get_number_irrelevant_features(training_sample):
     count = 0
@@ -279,6 +404,8 @@ def get_number_irrelevant_features(training_sample):
         count = count + 1
     return count
 
+def avg(l):
+    return float(sum(l))/len(l)
 
 def main():
     if len(sys.argv) < 2:
@@ -291,10 +418,10 @@ def main():
         random.shuffle(data)
 
         training_set = data[len(data)/2 :]
-        validation_set = data[: len(data)/2]
+        test_set = data[: len(data)/2]
         # (result, errors) = run_EGD(training_set, validation_set, stepsize_constant_var, True)
-        (result, (errors, error_rate)) = run_EGD(training_set, validation_set, stepsize_constant_var, True)
-        print "Validation Set Error Rate: " + str(calc_error_rate(result, validation_set))
+        (result, (errors, error_rate)) = run_EGD(training_set, test_set, True)
+        print "Test Set Error Rate: " + str(calc_error_rate(result, test_set))
         output_final_w(result)
         f_0 = plt.figure(0)
         f_0.canvas.set_window_title(filename)
@@ -317,35 +444,47 @@ def main():
 
 
         random.shuffle(data)
+        test_set = data[2*len(data)/3 : ]
+
+        data = data[ : 2*len(data)/3]
         training_set = data[len(data)/2 : ]
         validation_set = data[ : len(data)/2]
-
+        print "Length of Test Set:", len(test_set)
+        print "Length of Validation Set:", len(validation_set)
+        print "Length of Training Set:", (len(training_set))
         stepsize_constant = find_stepsize(training_set, validation_set)
-        l1_norm = tune_l1_norm(training_set, validation_set, stepsize_constant)
+        training_set = sort_data_analysis_equation("easy", training_set, wstar)
+        (l1_norm, stepsize_constant) = tune_l1_norm_stepsize(training_set, validation_set, number_irrelevant_features)
         lambda_ = 0.0
+
+       # l1_norm = 16.0
+        #stepsize_constant = 4.0
 
         print "Number of Irrelevant Features:", get_number_irrelevant_features(wstar)
         print "Running Hard->Easy"
-        (hard_error_rate, hard_objective_func_val, obj_plot_hard, hard_err_trace) = curriculum_learning("hard", num_runs, data, number_irrelevant_features)#, lambda_, stepsize_constant, l1_norm)
+        (hard_error_rate, hard_objective_func_val, obj_plot_hard, hard_err_trace, hard_std_dev_err_trace) = curriculum_learning("hard", num_runs, data, number_irrelevant_features, wstar, lambda_, stepsize_constant, l1_norm, test_set = test_set)
         print "Running Easy->Hard"
-        (easy_error_rate, easy_objective_func_val, obj_plot_easy, easy_err_trace) = curriculum_learning("easy", num_runs, data, number_irrelevant_features)#, lambda_, stepsize_constant, l1_norm)
+        (easy_error_rate, easy_objective_func_val, obj_plot_easy, easy_err_trace, easy_std_dev_err_trace) = curriculum_learning("easy", num_runs, data, number_irrelevant_features, wstar, lambda_, stepsize_constant, l1_norm, test_set = test_set)
         print "Running Random"
-        (random_error_rate, random_objective_func_val, obj_plot_random, random_err_trace) = curriculum_learning("random", num_runs, data, number_irrelevant_features)#, lambda_, stepsize_constant, l1_norm)
-        print "Running Hard Half"
-        (hh_error_rate, hh_objective_func_val, obj_plot_hh, hh_err_trace) = curriculum_learning("hardhalf", num_runs, data, number_irrelevant_features, lambda_)#, stepsize_constant, l1_norm)
-        print "Running Easy Half"
-        (eh_error_rate, eh_objective_func_val, obj_plot_eh, eh_err_trace) = curriculum_learning("easyhalf", num_runs, data, number_irrelevant_features, lambda_)#, stepsize_constant, l1_norm)
+        (random_error_rate, random_objective_func_val, obj_plot_random, random_err_trace, random_std_dev_err_trace) = curriculum_learning("random", num_runs, data, number_irrelevant_features, wstar, lambda_, stepsize_constant, l1_norm, test_set = test_set)
+     #   print "Running Hard Half"
+     #  (hh_error_rate, hh_objective_func_val, obj_plot_hh, hh_err_trace, hh_std_dev_err_trace) = curriculum_learning("hardhalf", num_runs, data, number_irrelevant_features, lambda_, stepsize_constant, l1_norm, test_set = test_set)
+     #   print "Running Easy Half"
+     #   (eh_error_rate, eh_objective_func_val, obj_plot_eh, eh_err_trace, eh_std_dev_err_trace) = curriculum_learning("easyhalf", num_runs, data, number_irrelevant_features, lambda_, stepsize_constant, l1_norm, test_set = test_set)
 
         print "Error Rate of w*:", calc_error_rate(wstar, data)
+        print "Avg Error Rate Hard->Easy:", avg(hard_error_rate)
+        print "Avg Error Rate Easy->Hard:", avg(easy_error_rate)
+        print "Avg Error Rate random:", avg(random_error_rate)
 
         f_0 = plt.figure(0)
         f_0.canvas.set_window_title(filename)
         plt.plot(hard_error_rate)
         plt.plot(easy_error_rate)
         plt.plot(random_error_rate)
-        plt.plot(hh_error_rate)
-        plt.plot(eh_error_rate)
-        plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples', 'Hard Half', 'Easy Half'], loc='upper left')
+      #  plt.plot(hh_error_rate)
+      #  plt.plot(eh_error_rate)
+        plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='upper left')
         plt.ylabel('Error Rate')
 
         f_1 = plt.figure(1)
@@ -353,9 +492,9 @@ def main():
         plt.plot(hard_objective_func_val)
         plt.plot(easy_objective_func_val)
         plt.plot(random_objective_func_val)
-        plt.plot(hh_objective_func_val)
-        plt.plot(eh_objective_func_val) 
-        plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples', 'Hard Half', 'Easy Half'], loc='lower right')
+    #    plt.plot(hh_objective_func_val)
+    #    plt.plot(eh_objective_func_val) 
+        plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='upper left')
         plt.ylabel("Final Objective Function Value")
     
 
@@ -363,26 +502,37 @@ def main():
         plt.figure(2)
         f_2 = plt.figure(2)
         f_2.canvas.set_window_title(filename)
-        plt.plot(obj_plot_hard[10:])
-        plt.plot(obj_plot_easy[10:])
-        plt.plot(obj_plot_random[10:])
-        plt.plot(obj_plot_hh[10:])
-        plt.plot(obj_plot_eh[10:])
-        plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples', 'Hard Half', 'Easy Half'], loc='upper right')
+        plt.plot(obj_plot_hard)
+        plt.plot(obj_plot_easy)
+        plt.plot(obj_plot_random)
+    #    plt.plot(obj_plot_hh[10:])
+    #    plt.plot(obj_plot_eh[10:])
+        plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='upper right')
         plt.ylabel("Objective Function Value Trace")
 
 
 
         plt.figure(3)
-        f_2 = plt.figure(3)
-        f_2.canvas.set_window_title(filename)
+        f_3 = plt.figure(3)
+        f_3.canvas.set_window_title(filename)
         plt.plot(hard_err_trace)
         plt.plot(easy_err_trace)
         plt.plot(random_err_trace)
-        plt.plot(hh_err_trace)
-        plt.plot(eh_err_trace)
-        plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples', 'Hard Half', 'Easy Half'], loc='upper right')
+    #    plt.plot(hh_err_trace)
+    #    plt.plot(eh_err_trace)
+        plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='upper right')
         plt.ylabel("Error Rate Trace")
+
+        plt.figure(4)
+        f_4 = plt.figure(4)
+        f_4.canvas.set_window_title(filename)
+        plt.plot(hard_std_dev_err_trace)
+        plt.plot(easy_std_dev_err_trace)
+        plt.plot(random_std_dev_err_trace)
+    #    plt.plot(hh_std_dev_err_trace)
+    #    plt.plot(eh_std_dev_err_trace)
+        plt.legend(['Hard Examples First', 'Easy Examples First', 'Normal/Random Examples'], loc='upper right')
+        plt.ylabel("Custom")
 
         plt.show()  
         print "Outputting values"
@@ -390,8 +540,8 @@ def main():
         final_data.append(("Hard Examples First",(hard_error_rate, hard_objective_func_val, obj_plot_hard, hard_err_trace)))
         final_data.append(("Easy Examples First",(easy_error_rate, easy_objective_func_val, obj_plot_easy, easy_err_trace)))
         final_data.append(("Random Examples First",(random_error_rate, random_objective_func_val, obj_plot_random, random_err_trace)))
-        final_data.append(("Hard Half",(hh_error_rate, hh_objective_func_val, obj_plot_hh, hh_err_trace)))
-        final_data.append(("Easy Half",(eh_error_rate, eh_objective_func_val, obj_plot_eh, eh_err_trace)))
+    #    final_data.append(("Hard Half",(hh_error_rate, hh_objective_func_val, obj_plot_hh, hh_err_trace)))
+    #    final_data.append(("Easy Half",(eh_error_rate, eh_objective_func_val, obj_plot_eh, eh_err_trace)))
 
         time = strftime("%Y-%m-%d %H:%M:%S", gmtime())
         output_final_data(filename + "-" + time, final_data)
