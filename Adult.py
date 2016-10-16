@@ -155,7 +155,7 @@ def load_data(filename):
 
 		if not(found):
 			print tokens
-			print "CRAP"
+			print "uhoh"
 			break
 
 		features.append(1.0)
