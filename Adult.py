@@ -44,7 +44,7 @@ def load_data(filename):
 				features.append(0.0)
 
 		if not(found):
-			print "CRAP"
+			print "uhoh"
 			break
 		# fnlwage
 		features.append(float(tokens[2]))	
@@ -60,7 +60,7 @@ def load_data(filename):
 
 		if not(found):
 			print tokens
-			print "CRAP"
+			print "uhoh"
 			break
 		# education num
 		features.append(float(tokens[4]))
@@ -76,7 +76,7 @@ def load_data(filename):
 
 		if not(found):
 			print tokens
-			print "CRAP"
+			print "uhoh"
 			break
 		# occupation
 		found = False
@@ -90,7 +90,7 @@ def load_data(filename):
 
 		if not(found):
 			print tokens
-			print "CRAP"
+			print "uhoh"
 			break
 
 		# relationship
@@ -105,7 +105,7 @@ def load_data(filename):
 
 		if not(found):
 			print tokens
-			print "CRAP"
+			print "uhoh"
 			break
 
 		# race
@@ -120,7 +120,7 @@ def load_data(filename):
 
 		if not(found):
 			print tokens
-			print "CRAP"
+			print "uhoh"
 			break
 		#sex 
 		found = False
@@ -134,7 +134,7 @@ def load_data(filename):
 
 		if not(found):
 			print tokens
-			print "CRAP"
+			print "uhoh"
 			break
 
 		# capital gain
